@@ -165,11 +165,10 @@ main = do
         width = read $ args !! 1
         height = read $ args !! 2
         operator_site_tensors = makeModelOperatorSiteTensors angle width height
-        bandwidth_increment = 5
         initial_bandwidth = 2
-        bandwidth_increase_energy_change_convergence_criterion = 1e-2
-        multisweep_energy_change_convergence_criterion = 1e-2
-        level_similarity_tolerance = 1e-3
+        increment_factor = 1.5 :: Float
+        bandwidth_increase_energy_change_convergence_criterion = 1e-5
+        multisweep_energy_change_convergence_criterion = 1e-4
 
     putStrLn $ "Angle = " ++ show angle
     putStrLn $ "Width = " ++ show width
@@ -192,12 +191,12 @@ main = do
             alwaysDeclareVictory chain
         callback_to_increase_bandwidth chain = do
             next_bandwidth <- readIORef next_bandwidth_ref
-            writeIORef next_bandwidth_ref (next_bandwidth+bandwidth_increment)
+            writeIORef next_bandwidth_ref (floor $ fromIntegral next_bandwidth*increment_factor)
             increaseChainBandwidth 2 next_bandwidth chain
         callback_after_each_sweep victory_flag latest_chain = do
             heading <- getHeading
             next_bandwidth <- readIORef next_bandwidth_ref
-            let current_bandwidth = next_bandwidth-bandwidth_increment
+            let current_bandwidth = (ceiling $ fromIntegral next_bandwidth/increment_factor :: Int) `div` 2
             unless (current_bandwidth <= 2) $
                 putStrLn $ heading ++ (printf "bandwidth = %i, sweep energy = %f" current_bandwidth (chainEnergy latest_chain) )
     -- @-node:gcross.20100130190931.1271:<< Define callbacks >>
@@ -209,7 +208,7 @@ main = do
         solveForMultipleLevelsWithCallbacks
             callback_to_decide_whether_to_declare_victory_with_trial
             (newChainCreator
-                (writeIORef next_bandwidth_ref (initial_bandwidth+bandwidth_increment))
+                (writeIORef next_bandwidth_ref ((floor $ fromIntegral initial_bandwidth*increment_factor)))
                 operator_site_tensors
                 2 initial_bandwidth
             )
